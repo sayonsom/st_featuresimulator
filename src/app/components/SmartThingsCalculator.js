@@ -1,13 +1,21 @@
 'use client'
 
-// SmartThingsCalculator.js
-'use client';
-
 import React, { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const SmartThingsCalculator = () => {
   const [billAmount, setBillAmount] = useState('');
+  const [taxPercentage, setTaxPercentage] = useState(5); // Default 5% tax
+  const [sanctionedLoad, setSanctionedLoad] = useState(5); // Default 5KW
+  const [loadRate, setLoadRate] = useState(120); // Default 120 Rs/KW
+  const [slabRates, setSlabRates] = useState({
+    slab1: 4.5,  // 0-50
+    slab2: 5.9,  // 50-100
+    slab3: 6.25, // 100-300
+    slab4: 7.0,  // 300-500
+    slab5: 8.5   // 500+
+  });
+  
   const [applianceUsage, setApplianceUsage] = useState({
     fridge: { kwh: 90, smartSavings: 0.20, isSmartEnabled: false },
     ac: { kwh: 300, smartSavings: 0.15, isSmartEnabled: false },
@@ -15,39 +23,60 @@ const SmartThingsCalculator = () => {
   });
   const [result, setResult] = useState(null);
 
-  const FIXED_CHARGE = 50;
+  const getFixedCharge = () => sanctionedLoad * loadRate;
 
   const slabs = [
-    { limit: 100, rate: 3 },
-    { limit: 300, rate: 4.50 },
-    { limit: 500, rate: 6 },
-    { limit: Infinity, rate: 7.50 }
+    { limit: 50, rate: slabRates.slab1 },
+    { limit: 100, rate: slabRates.slab2 },
+    { limit: 300, rate: slabRates.slab3 },
+    { limit: 500, rate: slabRates.slab4 },
+    { limit: Infinity, rate: slabRates.slab5 }
   ];
 
   const calculateUsage = (totalBill) => {
+    const fixedCharge = getFixedCharge();
+    
+    // First, subtract fixed charge from total bill
+    const billWithoutFixed = totalBill - fixedCharge;
+    
+    // Calculate tax only on the energy charges portion
+    const energyChargesWithoutTax = billWithoutFixed / (1 + (taxPercentage / 100));
+    const taxOnEnergyCharges = billWithoutFixed - energyChargesWithoutTax;
+    
+    let remainingBill = energyChargesWithoutTax;
     let totalKwh = 0;
-    let remainingBill = totalBill - FIXED_CHARGE;
     const slabUsage = [];
 
     for (let i = 0; i < slabs.length; i++) {
-      const { limit, rate } = slabs[i];
-      if (remainingBill <= 0) break;
+        const { limit, rate } = slabs[i];
+        if (remainingBill <= 0) break;
 
-      const prevLimit = i > 0 ? slabs[i-1].limit : 0;
-      const maxPossibleKwh = i < slabs.length - 1 ? limit - prevLimit : remainingBill / rate;
-      const costForSlab = Math.min(maxPossibleKwh * rate, remainingBill);
-      let kwhInSlab = costForSlab / rate;
+        const prevLimit = i > 0 ? slabs[i-1].limit : 0;
+        const maxPossibleKwh = limit - prevLimit;
+        const costForSlab = Math.min(maxPossibleKwh * rate, remainingBill);
+        let kwhInSlab = costForSlab / rate;
 
-      slabUsage.push({ kwh: kwhInSlab, cost: costForSlab, rate });
-      totalKwh += kwhInSlab;
-      remainingBill -= costForSlab;
+        slabUsage.push({ kwh: kwhInSlab, cost: costForSlab, rate });
+        totalKwh += kwhInSlab;
+        remainingBill -= costForSlab;
     }
 
-    return { totalKwh, slabUsage };
-  };
+    return {
+        totalKwh,
+        slabUsage,
+        fixedCharge,
+        energyChargesWithoutTax,
+        taxOnEnergyCharges,
+        totalBillBreakdown: {
+            energyCharges: energyChargesWithoutTax,
+            fixedCharge: fixedCharge,
+            tax: taxOnEnergyCharges,
+            total: energyChargesWithoutTax + fixedCharge + taxOnEnergyCharges
+        }
+    };
+};
 
   const applySmartApplianceEfficiency = (totalKwh) => {
-    let smartKwh = totalKwh;
     let totalSavings = 0;
 
     Object.entries(applianceUsage).forEach(([appliance, details]) => {
@@ -57,7 +86,7 @@ const SmartThingsCalculator = () => {
       }
     });
 
-    return smartKwh - totalSavings;
+    return totalKwh - totalSavings;
   };
 
   const calculateSlabwiseCosts = (totalKwh) => {
@@ -113,40 +142,56 @@ const SmartThingsCalculator = () => {
   };
 
   const getSlabNumber = (kwh) => {
-    if (kwh <= 100) return 1;
-    if (kwh <= 300) return 2;
-    if (kwh <= 500) return 3;
-    return 4;
+    if (kwh <= 50) return 1;
+    if (kwh <= 100) return 2;
+    if (kwh <= 300) return 3;
+    if (kwh <= 500) return 4;
+    return 5;
   };
 
   const handleCalculate = () => {
     const bill = parseFloat(billAmount);
-    if (isNaN(bill) || bill <= FIXED_CHARGE) {
-      alert('Please enter a valid bill amount greater than the fixed charge');
-      return;
+    if (isNaN(bill) || bill <= getFixedCharge()) {
+        alert('Please enter a valid bill amount greater than the fixed charge');
+        return;
     }
 
-    const { totalKwh } = calculateUsage(bill);
+    const {
+        totalKwh,
+        slabUsage,
+        totalBillBreakdown,
+        energyChargesWithoutTax,
+        taxOnEnergyCharges
+    } = calculateUsage(bill);
+
     const smartTotalKwh = applySmartApplianceEfficiency(totalKwh);
 
     const regularSlabCosts = calculateSlabwiseCosts(totalKwh);
     const smartSlabCosts = calculateSlabwiseCosts(smartTotalKwh);
 
+    // Calculate smart savings with tax implications
+    const regularTotalCost = regularSlabCosts.reduce((sum, slab) => sum + slab.cost, 0);
+    const smartTotalCost = smartSlabCosts.reduce((sum, slab) => sum + slab.cost, 0);
+    const costSavings = regularTotalCost - smartTotalCost;
+    const taxSavings = costSavings * (taxPercentage / 100);
+
     const dailyUsageData = generateDailyUsageData(totalKwh, smartTotalKwh);
     const slabTransitionData = generateSlabData(totalKwh, smartTotalKwh);
 
     setResult({
-      regularUsage: totalKwh,
-      smartUsage: smartTotalKwh,
-      regularSlabCosts,
-      smartSlabCosts,
-      dailyUsageData,
-      slabTransitionData,
-      savings: totalKwh - smartTotalKwh,
-      billWithoutFixed: bill - FIXED_CHARGE,
+        regularUsage: totalKwh,
+        smartUsage: smartTotalKwh,
+        regularSlabCosts,
+        smartSlabCosts,
+        dailyUsageData,
+        slabTransitionData,
+        savings: totalKwh - smartTotalKwh,
+        billBreakdown: totalBillBreakdown,
+        costSavings: costSavings,
+        taxSavings: taxSavings,
+        totalSavings: costSavings + taxSavings
     });
-  };
-
+};
   const handleApplianceChange = (appliance, field, value) => {
     setApplianceUsage(prev => ({
       ...prev,
@@ -164,24 +209,79 @@ const SmartThingsCalculator = () => {
       </h1>
       
       <div className="space-y-6">
-      <div className="text-sm text-gray-600 mb-2">
-            Extract data from Bharat Bill Pay API with customer consent (₹)
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Bill Amount (₹)
+            </label>
+            <input
+              type="number"
+              value={billAmount}
+              onChange={(e) => setBillAmount(e.target.value)}
+              placeholder="Enter total bill amount"
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Tax Percentage (%)
+            </label>
+            <input
+              type="number"
+              value={taxPercentage}
+              onChange={(e) => setTaxPercentage(parseFloat(e.target.value) || 0)}
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
         </div>
-        <div className="flex space-x-2">
-        
-          <input
-            type="number"
-            value={billAmount}
-            onChange={(e) => setBillAmount(e.target.value)}
-            placeholder="Enter total bill amount (₹)"
-            className="flex-grow px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            onClick={handleCalculate}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            Calculate
-          </button>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Sanctioned Load (KW)
+            </label>
+            <input
+              type="number"
+              value={sanctionedLoad}
+              onChange={(e) => setSanctionedLoad(parseFloat(e.target.value) || 0)}
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Load Rate (₹/KW)
+            </label>
+            <input
+              type="number"
+              value={loadRate}
+              onChange={(e) => setLoadRate(parseFloat(e.target.value) || 0)}
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Slab Rates (₹/unit)</h3>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {Object.entries(slabRates).map(([slab, rate], index) => (
+              <div key={slab} className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">
+                  Slab {index + 1}
+                </label>
+                <input
+                  type="number"
+                  value={rate}
+                  onChange={(e) => setSlabRates(prev => ({
+                    ...prev,
+                    [slab]: parseFloat(e.target.value) || 0
+                  }))}
+                  className="w-full px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="space-y-4">
@@ -210,54 +310,178 @@ const SmartThingsCalculator = () => {
           ))}
         </div>
 
+        <div className="flex justify-center">
+          <button
+            onClick={handleCalculate}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            Calculate
+          </button>
+        </div>
+
         {result && (
-          <div className="space-y-6">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-semibold mb-2">Bill Breakdown:</h3>
-              <p>Fixed Charges: ₹{FIXED_CHARGE.toFixed(2)}</p>
-              <p>Energy Charges: ₹{result.billWithoutFixed.toFixed(2)}</p>
-              <p className="font-bold">Total Bill: ₹{(result.billWithoutFixed + FIXED_CHARGE).toFixed(2)}</p>
+    <div className="space-y-6">
+        {/* New Summary Cards Row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Total kWh Card */}
+            <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
+                <div className="p-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                            <div className="rounded-full p-3 bg-blue-50">
+                                <svg 
+                                    xmlns="http://www.w3.org/2000/svg" 
+                                    className="h-6 w-6 text-blue-500" 
+                                    fill="none" 
+                                    viewBox="0 0 24 24" 
+                                    stroke="currentColor"
+                                >
+                                    <path 
+                                        strokeLinecap="round" 
+                                        strokeLinejoin="round" 
+                                        strokeWidth={2} 
+                                        d="M13 10V3L4 14h7v7l9-11h-7z" 
+                                    />
+                                </svg>
+                            </div>
+                            <div className="ml-4">
+                                <h2 className="text-sm font-medium text-gray-600">Total Energy Consumption</h2>
+                                <div className="flex items-baseline">
+                                    <p className="text-2xl font-semibold text-gray-900">
+                                        {result.regularUsage.toFixed(1)}
+                                    </p>
+                                    <p className="ml-1 text-sm font-medium text-gray-500">kWh</p>
+                                </div>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    Calculated from your bill amount
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-semibold mb-2">Usage Comparison:</h3>
-              <p>Regular Usage: {result.regularUsage.toFixed(2)} kWh</p>
-              <p>Smart Usage: {result.smartUsage.toFixed(2)} kWh</p>
-              <p className="font-bold">Total Savings: {result.savings.toFixed(2)} kWh</p>
+            {/* Smart Energy Savings Card */}
+            <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
+                <div className="p-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                            <div className="rounded-full p-3 bg-green-50">
+                                <svg 
+                                    xmlns="http://www.w3.org/2000/svg" 
+                                    className="h-6 w-6 text-green-500" 
+                                    fill="none" 
+                                    viewBox="0 0 24 24" 
+                                    stroke="currentColor"
+                                >
+                                    <path 
+                                        strokeLinecap="round" 
+                                        strokeLinejoin="round" 
+                                        strokeWidth={2} 
+                                        d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" 
+                                    />
+                                </svg>
+                            </div>
+                            <div className="ml-4">
+                                <h2 className="text-sm font-medium text-gray-600">Smart Energy Savings</h2>
+                                <div className="flex items-baseline space-x-4">
+                                    <div>
+                                        <p className="text-2xl font-semibold text-gray-900">
+                                            {result.savings.toFixed(1)}
+                                        </p>
+                                        <p className="text-sm font-medium text-gray-500">kWh Saved</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-2xl font-semibold text-green-600">
+                                            ₹{result.totalSavings.toFixed(1)}
+                                        </p>
+                                        <p className="text-sm font-medium text-gray-500">Money Saved</p>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    {((result.savings / result.regularUsage) * 100).toFixed(1)}% reduction in consumption
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
+        </div>
+        <div className="bg-gray-50 p-4 rounded-lg">
+            <h3 className="font-semibold mb-4">Detailed Bill Breakdown:</h3>
+            <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                    <span className="text-gray-600">Fixed Charges:</span>
+                    <span className="text-right">₹{result.billBreakdown.fixedCharge.toFixed(2)}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                    <span className="text-gray-600">Energy Charges (Before Tax):</span>
+                    <span className="text-right">₹{result.billBreakdown.energyCharges.toFixed(2)}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                    <span className="text-gray-600">Tax ({taxPercentage}% on Energy Charges):</span>
+                    <span className="text-right">₹{result.billBreakdown.tax.toFixed(2)}</span>
+                </div>
+                <div className="border-t pt-2 grid grid-cols-2 gap-2 font-bold">
+                    <span>Total Bill:</span>
+                    <span className="text-right">₹{result.billBreakdown.total.toFixed(2)}</span>
+                </div>
+            </div>
+        </div>
+
+        <div className="bg-gray-50 p-4 rounded-lg">
+            <h3 className="font-semibold mb-4">Smart Device Savings:</h3>
+            <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                    <span className="text-gray-600">Energy Usage Savings:</span>
+                    <span className="text-right">{result.savings.toFixed(2)} kWh</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                    <span className="text-gray-600">Cost Savings (Before Tax):</span>
+                    <span className="text-right">₹{result.costSavings.toFixed(2)}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                    <span className="text-gray-600">Tax Savings:</span>
+                    <span className="text-right">₹{result.taxSavings.toFixed(2)}</span>
+                </div>
+                <div className="border-t pt-2 grid grid-cols-2 gap-2 font-bold">
+                    <span>Total Money Saved:</span>
+                    <span className="text-right">₹{result.totalSavings.toFixed(2)}</span>
+                </div>
+            </div>
+        </div>
 
             <div>
               <h3 className="font-semibold mb-2">Slab-wise Cost Comparison:</h3>
               <div className="overflow-x-auto">
                 <table className="min-w-full bg-white border border-gray-200">
-                  
-                    <thead>
-                        <tr className="bg-gray-50">
-                            <th className="px-4 py-2 border">Slab</th>
-                            <th className="px-4 py-2 border">Unit Cost (₹)</th>
-                            <th className="px-4 py-2 border">Regular Usage (kWh)</th>
-                            <th className="px-4 py-2 border">Regular Cost (₹)</th>
-                            <th className="px-4 py-2 border">Smart Usage (kWh)</th>
-                            <th className="px-4 py-2 border">Smart Cost (₹)</th>
-                            <th className="px-4 py-2 border">Savings (₹)</th>
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="px-4 py-2 border">Slab</th>
+                      <th className="px-4 py-2 border">Unit Cost (₹)</th>
+                      <th className="px-4 py-2 border">Regular Usage (kWh)</th>
+                      <th className="px-4 py-2 border">Regular Cost (₹)</th>
+                      <th className="px-4 py-2 border">Smart Usage (kWh)</th>
+                      <th className="px-4 py-2 border">Smart Cost (₹)</th>
+                      <th className="px-4 py-2 border">Savings (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                  {result.regularSlabCosts.map((regular, index) => {
+                      const smart = result.smartSlabCosts[index] || { kwh: 0, cost: 0 };
+                      return (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 border text-center">{regular.slab}</td>
+                          <td className="px-4 py-2 border text-center">{slabs[index].rate.toFixed(2)}</td>
+                          <td className="px-4 py-2 border text-right">{regular.kwh.toFixed(2)}</td>
+                          <td className="px-4 py-2 border text-right">{regular.cost.toFixed(2)}</td>
+                          <td className="px-4 py-2 border text-right">{smart.kwh.toFixed(2)}</td>
+                          <td className="px-4 py-2 border text-right">{smart.cost.toFixed(2)}</td>
+                          <td className="px-4 py-2 border text-right">{(regular.cost - smart.cost).toFixed(2)}</td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        {result.regularSlabCosts.map((regular, index) => {
-                            const smart = result.smartSlabCosts[index] || { kwh: 0, cost: 0 };
-                            return (
-                            <tr key={index} className="hover:bg-gray-50">
-                                <td className="px-4 py-2 border text-center">{regular.slab}</td>
-                                <td className="px-4 py-2 border text-center">{slabs[index].rate.toFixed(2)}</td>
-                                <td className="px-4 py-2 border text-right">{regular.kwh.toFixed(2)}</td>
-                                <td className="px-4 py-2 border text-right">{regular.cost.toFixed(2)}</td>
-                                <td className="px-4 py-2 border text-right">{smart.kwh.toFixed(2)}</td>
-                                <td className="px-4 py-2 border text-right">{smart.cost.toFixed(2)}</td>
-                                <td className="px-4 py-2 border text-right">{(regular.cost - smart.cost).toFixed(2)}</td>
-                            </tr>
-                            );
-                        })}
-                    </tbody>
+                      );
+                    })}
+                  </tbody>
                 </table>
               </div>
             </div>
@@ -290,8 +514,8 @@ const SmartThingsCalculator = () => {
                     height={60}
                   />
                   <YAxis 
-                    domain={[1, 4]} 
-                    ticks={[1, 2, 3, 4]} 
+                    domain={[1, 5]} 
+                    ticks={[1, 2, 3, 4, 5]} 
                     label={{ 
                       value: 'Slab', 
                       angle: -90, 
@@ -324,10 +548,11 @@ const SmartThingsCalculator = () => {
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="font-semibold mb-2">Slab Definitions:</h3>
               <div className="space-y-1">
-                <p>Slab 1: 0-100 kWh (₹3.00/unit)</p>
-                <p>Slab 2: 101-300 kWh (₹4.50/unit)</p>
-                <p>Slab 3: 301-500 kWh (₹6.00/unit)</p>
-                <p>Slab 4: Above 500 kWh (₹7.50/unit)</p>
+                <p>Slab 1: 0-50 kWh (₹{slabRates.slab1}/unit)</p>
+                <p>Slab 2: 51-100 kWh (₹{slabRates.slab2}/unit)</p>
+                <p>Slab 3: 101-300 kWh (₹{slabRates.slab3}/unit)</p>
+                <p>Slab 4: 301-500 kWh (₹{slabRates.slab4}/unit)</p>
+                <p>Slab 5: Above 500 kWh (₹{slabRates.slab5}/unit)</p>
               </div>
             </div>
           </div>
