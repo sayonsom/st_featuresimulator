@@ -203,15 +203,15 @@ const SmartThingsCalculator = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-6">
-      <h1 className="text-2xl font-bold text-center mb-6">
-        SmartThings - Proposed Tariff Rate Integration Features
+    <div className="max-w-4xl mx-auto bg-gray-800 dark:bg-gray-900 text-gray-100 rounded-lg shadow-lg p-6">
+      <h1 className="text-2xl font-bold text-center mb-6 text-gray-100">
+        SmartThings - Energy Savings Calculator
       </h1>
       
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-gray-200">
               Bill Amount (₹)
             </label>
             <input
@@ -219,55 +219,55 @@ const SmartThingsCalculator = () => {
               value={billAmount}
               onChange={(e) => setBillAmount(e.target.value)}
               placeholder="Enter total bill amount"
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 bg-gray-700 dark:bg-gray-800 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-100 placeholder-gray-400"
             />
           </div>
           
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-gray-200">
               Tax Percentage (%)
             </label>
             <input
               type="number"
               value={taxPercentage}
               onChange={(e) => setTaxPercentage(parseFloat(e.target.value) || 0)}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 bg-gray-700 dark:bg-gray-800 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-100"
             />
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-gray-200">
               Sanctioned Load (KW)
             </label>
             <input
               type="number"
               value={sanctionedLoad}
               onChange={(e) => setSanctionedLoad(parseFloat(e.target.value) || 0)}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 bg-gray-700 dark:bg-gray-800 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-100"
             />
           </div>
           
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-gray-200">
               Load Rate (₹/KW)
             </label>
             <input
               type="number"
               value={loadRate}
               onChange={(e) => setLoadRate(parseFloat(e.target.value) || 0)}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 bg-gray-700 dark:bg-gray-800 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-100"
             />
           </div>
         </div>
 
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Slab Rates (₹/unit)</h3>
+          <h3 className="text-lg font-semibold text-gray-200">Slab Rates (₹/unit)</h3>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {Object.entries(slabRates).map(([slab, rate], index) => (
               <div key={slab} className="space-y-1">
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-200">
                   Slab {index + 1}
                 </label>
                 <input
@@ -277,7 +277,7 @@ const SmartThingsCalculator = () => {
                     ...prev,
                     [slab]: parseFloat(e.target.value) || 0
                   }))}
-                  className="w-full px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-2 py-1 bg-gray-700 dark:bg-gray-800 border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-100"
                 />
               </div>
             ))}
@@ -285,18 +285,18 @@ const SmartThingsCalculator = () => {
         </div>
 
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Appliance Usage</h3>
+          <h3 className="text-lg font-semibold text-gray-200">Appliance Usage</h3>
           {Object.entries(applianceUsage).map(([appliance, details]) => (
             <div key={appliance} className="flex items-center space-x-4">
-              <label className="w-32 text-sm font-medium capitalize">{appliance}:</label>
+              <label className="w-32 text-sm font-medium capitalize text-gray-200">{appliance}:</label>
               <input
                 type="number"
                 value={details.kwh}
                 onChange={(e) => handleApplianceChange(appliance, 'kwh', e.target.value)}
-                className="w-24 px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-24 px-2 py-1 bg-gray-700 dark:bg-gray-800 border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-100"
                 placeholder="kWh"
               />
-              <span className="text-sm text-gray-500">kWh</span>
+              <span className="text-sm text-gray-400">kWh</span>
               <label className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -304,7 +304,7 @@ const SmartThingsCalculator = () => {
                   onChange={(e) => handleApplianceChange(appliance, 'isSmartEnabled', e.target.checked)}
                   className="rounded text-blue-600 focus:ring-blue-500"
                 />
-                <span className="text-sm">Samsung AI Energy Savings Mode</span>
+                <span className="text-sm text-gray-400">Samsung AI Energy Savings Mode</span>
               </label>
             </div>
           ))}
@@ -324,14 +324,14 @@ const SmartThingsCalculator = () => {
         {/* New Summary Cards Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Total kWh Card */}
-            <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
+            <div className="bg-gray-700 dark:bg-gray-800 rounded-xl shadow-md overflow-hidden border border-gray-600">
                 <div className="p-6">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center">
-                            <div className="rounded-full p-3 bg-blue-50">
+                            <div className="rounded-full p-3 bg-blue-900 dark:bg-blue-800">
                                 <svg 
                                     xmlns="http://www.w3.org/2000/svg" 
-                                    className="h-6 w-6 text-blue-500" 
+                                    className="h-6 w-6 text-blue-200" 
                                     fill="none" 
                                     viewBox="0 0 24 24" 
                                     stroke="currentColor"
@@ -345,12 +345,12 @@ const SmartThingsCalculator = () => {
                                 </svg>
                             </div>
                             <div className="ml-4">
-                                <h2 className="text-sm font-medium text-gray-600">Total Energy Consumption</h2>
+                                <h2 className="text-sm font-medium text-gray-300">Total Energy Consumption</h2>
                                 <div className="flex items-baseline">
-                                    <p className="text-2xl font-semibold text-gray-900">
+                                    <p className="text-2xl font-semibold text-gray-100">
                                         {result.regularUsage.toFixed(1)}
                                     </p>
-                                    <p className="ml-1 text-sm font-medium text-gray-500">kWh</p>
+                                    <p className="ml-1 text-sm font-medium text-gray-400">kWh</p>
                                 </div>
                                 <p className="text-sm text-gray-500 mt-1">
                                     Calculated from your bill amount
@@ -362,7 +362,7 @@ const SmartThingsCalculator = () => {
             </div>
 
             {/* Smart Energy Savings Card */}
-            <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
+            <div className="bg-gray-700 dark:bg-gray-800 rounded-xl shadow-md overflow-hidden border border-gray-600">
                 <div className="p-6">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center">
@@ -383,19 +383,19 @@ const SmartThingsCalculator = () => {
                                 </svg>
                             </div>
                             <div className="ml-4">
-                                <h2 className="text-sm font-medium text-gray-600">Smart Energy Savings</h2>
+                                <h2 className="text-sm font-medium text-gray-300">Smart Energy Savings</h2>
                                 <div className="flex items-baseline space-x-4">
                                     <div>
-                                        <p className="text-2xl font-semibold text-gray-900">
+                                        <p className="text-2xl font-semibold text-gray-100">
                                             {result.savings.toFixed(1)}
                                         </p>
-                                        <p className="text-sm font-medium text-gray-500">kWh Saved</p>
+                                        <p className="text-sm font-medium text-gray-400">kWh Saved</p>
                                     </div>
                                     <div>
                                         <p className="text-2xl font-semibold text-green-600">
                                             ₹{result.totalSavings.toFixed(1)}
                                         </p>
-                                        <p className="text-sm font-medium text-gray-500">Money Saved</p>
+                                        <p className="text-sm font-medium text-gray-400">Money Saved</p>
                                     </div>
                                 </div>
                                 <p className="text-sm text-gray-500 mt-1">
@@ -408,7 +408,7 @@ const SmartThingsCalculator = () => {
             </div>
         </div>
         <div className="bg-gray-50 p-4 rounded-lg">
-            <h3 className="font-semibold mb-4">Detailed Bill Breakdown:</h3>
+            <h3 className="font-semibold mb-4 text-gray-200">Detailed Bill Breakdown:</h3>
             <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
                     <span className="text-gray-600">Fixed Charges:</span>
@@ -430,7 +430,7 @@ const SmartThingsCalculator = () => {
         </div>
 
         <div className="bg-gray-50 p-4 rounded-lg">
-            <h3 className="font-semibold mb-4">Smart Device Savings:</h3>
+            <h3 className="font-semibold mb-4 text-gray-200">Smart Device Savings:</h3>
             <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
                     <span className="text-gray-600">Energy Usage Savings:</span>
@@ -452,32 +452,32 @@ const SmartThingsCalculator = () => {
         </div>
 
             <div>
-              <h3 className="font-semibold mb-2">Slab-wise Cost Comparison:</h3>
+              <h3 className="font-semibold mb-2 text-gray-200">Slab-wise Cost Comparison:</h3>
               <div className="overflow-x-auto">
-                <table className="min-w-full bg-white border border-gray-200">
+                <table className="min-w-full bg-gray-700 dark:bg-gray-800 border border-gray-600">
                   <thead>
-                    <tr className="bg-gray-50">
-                      <th className="px-4 py-2 border">Slab</th>
-                      <th className="px-4 py-2 border">Unit Cost (₹)</th>
-                      <th className="px-4 py-2 border">Regular Usage (kWh)</th>
-                      <th className="px-4 py-2 border">Regular Cost (₹)</th>
-                      <th className="px-4 py-2 border">Smart Usage (kWh)</th>
-                      <th className="px-4 py-2 border">Smart Cost (₹)</th>
-                      <th className="px-4 py-2 border">Savings (₹)</th>
+                    <tr className="bg-gray-600 dark:bg-gray-700">
+                      <th className="px-4 py-2 border border-gray-600 text-gray-200">Slab</th>
+                      <th className="px-4 py-2 border border-gray-600 text-gray-200">Unit Cost (₹)</th>
+                      <th className="px-4 py-2 border border-gray-600 text-gray-200">Regular Usage (kWh)</th>
+                      <th className="px-4 py-2 border border-gray-600 text-gray-200">Regular Cost (₹)</th>
+                      <th className="px-4 py-2 border border-gray-600 text-gray-200">Smart Usage (kWh)</th>
+                      <th className="px-4 py-2 border border-gray-600 text-gray-200">Smart Cost (₹)</th>
+                      <th className="px-4 py-2 border border-gray-600 text-gray-200">Savings (₹)</th>
                     </tr>
                   </thead>
                   <tbody>
                   {result.regularSlabCosts.map((regular, index) => {
                       const smart = result.smartSlabCosts[index] || { kwh: 0, cost: 0 };
                       return (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-2 border text-center">{regular.slab}</td>
-                          <td className="px-4 py-2 border text-center">{slabs[index].rate.toFixed(2)}</td>
-                          <td className="px-4 py-2 border text-right">{regular.kwh.toFixed(2)}</td>
-                          <td className="px-4 py-2 border text-right">{regular.cost.toFixed(2)}</td>
-                          <td className="px-4 py-2 border text-right">{smart.kwh.toFixed(2)}</td>
-                          <td className="px-4 py-2 border text-right">{smart.cost.toFixed(2)}</td>
-                          <td className="px-4 py-2 border text-right">{(regular.cost - smart.cost).toFixed(2)}</td>
+                        <tr key={index} className="hover:bg-gray-600 dark:hover:bg-gray-700">
+                          <td className="px-4 py-2 border border-gray-600 text-gray-200 text-center">{regular.slab}</td>
+                          <td className="px-4 py-2 border border-gray-600 text-gray-200 text-center">{slabs[index].rate.toFixed(2)}</td>
+                          <td className="px-4 py-2 border border-gray-600 text-gray-200 text-right">{regular.kwh.toFixed(2)}</td>
+                          <td className="px-4 py-2 border border-gray-600 text-gray-200 text-right">{regular.cost.toFixed(2)}</td>
+                          <td className="px-4 py-2 border border-gray-600 text-gray-200 text-right">{smart.kwh.toFixed(2)}</td>
+                          <td className="px-4 py-2 border border-gray-600 text-gray-200 text-right">{smart.cost.toFixed(2)}</td>
+                          <td className="px-4 py-2 border border-gray-600 text-gray-200 text-right">{(regular.cost - smart.cost).toFixed(2)}</td>
                         </tr>
                       );
                     })}
@@ -487,22 +487,28 @@ const SmartThingsCalculator = () => {
             </div>
 
             <div className="h-80 w-full">
-              <h3 className="font-semibold mb-2">Daily Usage Comparison:</h3>
+              <h3 className="font-semibold mb-2 text-gray-200">Daily Usage Comparison:</h3>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={result.dailyUsageData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="day" />
-                  <YAxis />
-                  <Tooltip />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="day" stroke="#9CA3AF" />
+                  <YAxis stroke="#9CA3AF" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1F2937',
+                      border: '1px solid #374151',
+                      color: '#E5E7EB'
+                    }}
+                  />
                   <Legend />
-                  <Line type="monotone" dataKey="regularUsage" stroke="#8884d8" name="Regular Usage" />
-                  <Line type="monotone" dataKey="smartUsage" stroke="#82ca9d" name="Smart Usage" />
+                  <Line type="monotone" dataKey="regularUsage" stroke="#60A5FA" name="Regular Usage" />
+                  <Line type="monotone" dataKey="smartUsage" stroke="#34D399" name="Smart Usage" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
 
             <div className="h-80 w-full">
-              <h3 className="font-semibold mb-2">Slab Transitions Over Time:</h3>
+              <h3 className="font-semibold mb-2 text-gray-200">Slab Transitions Over Time:</h3>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={result.slabTransitionData}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -545,9 +551,9 @@ const SmartThingsCalculator = () => {
               </ResponsiveContainer>
             </div>
 
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-semibold mb-2">Slab Definitions:</h3>
-              <div className="space-y-1">
+            <div className="bg-gray-700 dark:bg-gray-800 p-4 rounded-lg border border-gray-600">
+              <h3 className="font-semibold mb-2 text-gray-200">Slab Definitions:</h3>
+              <div className="space-y-1 text-gray-300">
                 <p>Slab 1: 0-50 kWh (₹{slabRates.slab1}/unit)</p>
                 <p>Slab 2: 51-100 kWh (₹{slabRates.slab2}/unit)</p>
                 <p>Slab 3: 101-300 kWh (₹{slabRates.slab3}/unit)</p>
