@@ -663,11 +663,9 @@ const FurniturePlanner = () => {
 
     // Cleanup
     return () => {
-      renderer.domElement.removeEventListener('mousemove', onMouseMove);
-      renderer.domElement.removeEventListener('mousedown', onMouseDown);
-      renderer.domElement.removeEventListener('mouseup', onMouseUp);
-      if (mountRef.current?.contains(renderer.domElement)) {
-        mountRef.current.removeChild(renderer.domElement);
+      const currentContainer = container; // Store ref value
+      if (currentContainer?.contains(renderer.domElement)) {
+        currentContainer.removeChild(renderer.domElement);
       }
       composer.dispose();
       renderer.dispose();

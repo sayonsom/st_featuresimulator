@@ -1,12 +1,24 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
+// Move constants outside component
+const MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+];
+
+const SMART_SAVINGS = {
+  ac: 0.22,
+  fridge: 0.20,
+  washing: 0.15
+};
 
 const BaselineCalculator = () => {
   // Form state
@@ -32,11 +44,6 @@ const BaselineCalculator = () => {
     washingMachine: 0.8 // kWh per kg per cycle
   };
 
-  const MONTHS = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-  ];
-
   const AC_USAGE_PATTERNS = {
     high: ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'],
     medium: ['Mar', 'Nov'],
@@ -48,15 +55,9 @@ const BaselineCalculator = () => {
   
   // Carbon credit market value (INR per metric ton CO2e)
   const CARBON_CREDIT_VALUE = 800;  // Indian carbon market price
-  
-  // Smart savings percentages
-  const SMART_SAVINGS = {
-    ac: 0.22,
-    fridge: 0.20,
-    washing: 0.15
-  };
 
-  const calculateMonthlyEnergy = (month, excludeAC = false) => {
+  // Use useCallback for calculateMonthlyEnergy
+  const calculateMonthlyEnergy = useCallback((month, excludeAC = false) => {
     // Fridge calculation (constant throughout year)
     const fridgeDaily = (formData.fridgeSize / 100) * ENERGY_FACTORS.fridge;
     const fridgeMonthly = fridgeDaily * 30;
@@ -98,7 +99,7 @@ const BaselineCalculator = () => {
       washingEnergy,
       emissions: totalEnergy * EMISSION_FACTOR
     };
-  };
+  }, [formData]);
 
   const [monthlyData, setMonthlyData] = useState([]);
   const [comparisonData, setComparisonData] = useState([]);
@@ -206,7 +207,7 @@ const BaselineCalculator = () => {
 
     const annualData = calculateAnnualData();
     setAnnualSummary(annualData);
-  }, [formData]);
+  }, [formData, calculateMonthlyEnergy]);
 
   return (
     <div className="w-full space-y-6">
@@ -392,7 +393,10 @@ const BaselineCalculator = () => {
       {/* Emission Factors Info */}
       <Alert>
         <AlertDescription>
-          Calculations use an emission factor of {EMISSION_FACTOR} kg CO2e/kWh based on the Indian electricity grid.
+          Calculations use an emission factor of {EMISSION_FACTOR} kg CO2e/kWh based on India&apos;s electricity grid mix:
+          <br />- Coal-based power: ~70% of generation
+          <br />- Renewable sources: ~20% of generation
+          <br />- Other sources (nuclear, gas): ~10% of generation
         </AlertDescription>
       </Alert>
 
@@ -451,16 +455,6 @@ const BaselineCalculator = () => {
           <CardTitle>Understanding the Calculations</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <h3 className="font-semibold">Emission Factor ({EMISSION_FACTOR} kg CO2e/kWh)</h3>
-            <p className="text-sm text-gray-600">
-              Based on India's electricity grid mix:
-              <br />- Coal-based power: ~70% of generation
-              <br />- Renewable sources: ~20% of generation
-              <br />- Other sources (nuclear, gas): ~10% of generation
-            </p>
-          </div>
-
           <div className="space-y-2">
             <h3 className="font-semibold">Monthly Energy Calculations</h3>
             <div className="space-y-1 text-sm text-gray-600">

@@ -1,7 +1,7 @@
 'use client';
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -81,7 +81,7 @@ const SamsungPotential = () => {
     };
   };
 
-  const calculateYearlyProjections = () => {
+  const calculateYearlyProjections = useCallback(() => {
     const years = [2025, 2026, 2027, 2028, 2029, 2030];
     const projections = years.map(year => {
       const yearsSince2025 = year - 2025;
@@ -125,11 +125,13 @@ const SamsungPotential = () => {
     });
 
     setProjectionData(projections);
-  };
+    return projections;
+  }, [marketData]);
 
   useEffect(() => {
-    calculateYearlyProjections();
-  }, [marketData]);
+    const projections = calculateYearlyProjections();
+    setProjectionData(projections);
+  }, [calculateYearlyProjections]);
 
   const handleCustomerChange = (segment, value) => {
     setMarketData(prev => ({
@@ -631,7 +633,7 @@ const SamsungPotential = () => {
             <p className="text-xs leading-relaxed">
               Current calculations use ${CARBON_CREDIT_VALUE_USD} per ton of carbon credits. It could reach as high as $93 per ton by the end of the decade. 
               Meanwhile, carbon prices in the EU are forecast to average €71 per ton ($76 per ton) this year, down from €85 per ton in 2023. 
-              BNEF then projects the bloc's prices will head towards €149 per ton in 2030.
+              BNEF then projects the bloc&apos;s prices will head towards €149 per ton in 2030.
             </p>
           </div>
         </div>
