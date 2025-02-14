@@ -28,17 +28,15 @@ const CarbonCredits = () => {
             <BarChart3 className="w-4 h-4" />
             <span>Baseline</span>
           </TabsTrigger>
-          <TabsTrigger value="forecasts" className="flex items-center gap-2">
-            <TrendingUp className="w-4 h-4" />
-            <span>Forecasts</span>
-          </TabsTrigger>
-          <TabsTrigger value="verification" className="flex items-center gap-2">
-            <ClipboardCheck className="w-4 h-4" />
-            <span>Verification</span>
-          </TabsTrigger>
+          
           <TabsTrigger value="value" className="flex items-center gap-2">
             <DollarSign className="w-4 h-4" />
-            <span>Value Creation</span>
+            <span>Samsung Potential</span>
+          </TabsTrigger>
+
+          <TabsTrigger value="forecasts" className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4" />
+            <span>How it will work</span>
           </TabsTrigger>
         </TabsList>
 
@@ -86,37 +84,13 @@ const CarbonCredits = () => {
         </TabsContent>
 
         <TabsContent value="forecasts">
-          <Card>
-            <CardHeader>
-              <CardTitle>Emission Forecasts</CardTitle>
-              <CardDescription>Project your future emissions and credit potential</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="forecast-period">Forecast Period (Years)</Label>
-                  <Select>
-                    <SelectTrigger id="forecast-period">
-                      <SelectValue placeholder="Select period" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="5">5 Years</SelectItem>
-                      <SelectItem value="10">10 Years</SelectItem>
-                      <SelectItem value="15">15 Years</SelectItem>
-                      <SelectItem value="20">20 Years</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="reduction-target">Emission Reduction Target (%)</Label>
-                  <Input id="reduction-target" type="number" placeholder="Enter target percentage" />
-                </div>
-
-                <Button className="w-full">Generate Forecast</Button>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="mb-4">
+            <img 
+              src="/samsung_role.png" 
+              alt="Samsung's Role in Carbon Credits" 
+              className="w-full rounded-lg shadow-md"
+            />
+          </div>
         </TabsContent>
 
         <TabsContent value="verification">

@@ -37,17 +37,17 @@ const SamsungPotential = () => {
 
   const [marketData, setMarketData] = useState({
     // Single product segments
-    acOnly: { customers: 100000, adoptionRate: 20 },
-    fridgeOnly: { customers: 150000, adoptionRate: 25 },
-    washerOnly: { customers: 80000, adoptionRate: 15 },
+    acOnly: { customers: 123580, adoptionRate: 5 },
+    fridgeOnly: { customers: 139013, adoptionRate: 5 },
+    washerOnly: { customers: 284178, adoptionRate: 5 },
     
     // Two product combinations
-    acFridge: { customers: 50000, adoptionRate: 30 },
-    acWasher: { customers: 30000, adoptionRate: 20 },
-    fridgeWasher: { customers: 40000, adoptionRate: 25 },
+    acFridge: { customers: 49288, adoptionRate: 5 },
+    acWasher: { customers: 40750, adoptionRate: 5 },
+    fridgeWasher: { customers: 13140, adoptionRate: 5 },
     
     // All products
-    allProducts: { customers: 20000, adoptionRate: 35 }
+    allProducts: { customers: 24450, adoptionRate: 5 }
   });
 
   const [projectionData, setProjectionData] = useState([]);
