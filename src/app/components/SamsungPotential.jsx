@@ -37,22 +37,22 @@ const SamsungPotential = () => {
 
   const [marketData, setMarketData] = useState({
     // Single product segments
-    acOnly: { customers: 123580, adoptionRate: 5 },
-    fridgeOnly: { customers: 139013, adoptionRate: 5 },
-    washerOnly: { customers: 284178, adoptionRate: 5 },
+    acOnly: { customers: 123580, adoptionRate: 5, aiModeUsage: 50 },
+    fridgeOnly: { customers: 139013, adoptionRate: 5, aiModeUsage: 50 },
+    washerOnly: { customers: 284178, adoptionRate: 5, aiModeUsage: 50 },
     
     // Two product combinations
-    acFridge: { customers: 49288, adoptionRate: 5 },
-    acWasher: { customers: 40750, adoptionRate: 5 },
-    fridgeWasher: { customers: 13140, adoptionRate: 5 },
+    acFridge: { customers: 49288, adoptionRate: 5, aiModeUsage: 50 },
+    acWasher: { customers: 40750, adoptionRate: 5, aiModeUsage: 50 },
+    fridgeWasher: { customers: 13140, adoptionRate: 5, aiModeUsage: 50 },
     
     // All products
-    allProducts: { customers: 24450, adoptionRate: 5 }
+    allProducts: { customers: 24450, adoptionRate: 5, aiModeUsage: 50 }
   });
 
   const [projectionData, setProjectionData] = useState([]);
 
-  const calculateSegmentSavings = (segment) => {
+  const calculateSegmentSavings = (segment, data) => {
     let energySaved = 0;
     let carbonSaved = 0;
 
@@ -92,7 +92,7 @@ const SamsungPotential = () => {
 
       // Calculate for each segment
       Object.entries(marketData).forEach(([segment, data]) => {
-        const { adoptionRate, customers } = data;
+        const { adoptionRate, customers, aiModeUsage } = data;
         
         // Start with base adoption (100% of current customers in 2025)
         // Then add growth based on adoption rate for future years
@@ -103,14 +103,18 @@ const SamsungPotential = () => {
         
         // Combine base and additional adoption
         const cumulativeAdoption = baseAdoption + additionalAdoption;
-        const adoptedCustomers = customers * (cumulativeAdoption / 100);
         
-        const { energySaved, carbonSaved, carbonValue } = calculateSegmentSavings(segment);
-
-        totalEnergySaved += energySaved * adoptedCustomers;
-        totalCarbonSaved += carbonSaved * adoptedCustomers;
-        totalCarbonValue += carbonValue * adoptedCustomers;
-        adoptedHouseholds += adoptedCustomers;
+        // Calculate total adopted customers and then apply AI mode usage percentage
+        const totalAdoptedCustomers = customers * (cumulativeAdoption / 100);
+        const aiModeCustomers = totalAdoptedCustomers * (aiModeUsage / 100);
+        
+        // Only calculate savings for customers using AI mode
+        const { energySaved, carbonSaved, carbonValue } = calculateSegmentSavings(segment, data);
+        
+        totalEnergySaved += energySaved * aiModeCustomers;
+        totalCarbonSaved += carbonSaved * aiModeCustomers;
+        totalCarbonValue += carbonValue * aiModeCustomers;
+        adoptedHouseholds += aiModeCustomers; // Only count households using AI mode
       });
 
       return {
@@ -144,6 +148,13 @@ const SamsungPotential = () => {
     setMarketData(prev => ({
       ...prev,
       [segment]: { ...prev[segment], adoptionRate: value[0] }
+    }));
+  };
+
+  const handleAIModeChange = (segment, value) => {
+    setMarketData(prev => ({
+      ...prev,
+      [segment]: { ...prev[segment], aiModeUsage: value[0] }
     }));
   };
 
@@ -358,6 +369,16 @@ const SamsungPotential = () => {
                       />
                       <p className="text-sm text-gray-500 mt-1">{marketData.acOnly.adoptionRate}%</p>
                     </div>
+                    <div>
+                      <Label>AI Mode Usage (%)</Label>
+                      <Slider
+                        value={[marketData.acOnly.aiModeUsage]}
+                        max={100}
+                        step={1}
+                        onValueChange={(value) => handleAIModeChange('acOnly', value)}
+                      />
+                      <p className="text-sm text-gray-500 mt-1">{marketData.acOnly.aiModeUsage}%</p>
+                    </div>
                   </div>
 
                   {/* Fridge Only */}
@@ -380,6 +401,16 @@ const SamsungPotential = () => {
                       />
                       <p className="text-sm text-gray-500 mt-1">{marketData.fridgeOnly.adoptionRate}%</p>
                     </div>
+                    <div>
+                      <Label>AI Mode Usage (%)</Label>
+                      <Slider
+                        value={[marketData.fridgeOnly.aiModeUsage]}
+                        max={100}
+                        step={1}
+                        onValueChange={(value) => handleAIModeChange('fridgeOnly', value)}
+                      />
+                      <p className="text-sm text-gray-500 mt-1">{marketData.fridgeOnly.aiModeUsage}%</p>
+                    </div>
                   </div>
 
                   {/* Washer Only */}
@@ -401,6 +432,16 @@ const SamsungPotential = () => {
                         onValueChange={(value) => handleAdoptionChange('washerOnly', value)}
                       />
                       <p className="text-sm text-gray-500 mt-1">{marketData.washerOnly.adoptionRate}%</p>
+                    </div>
+                    <div>
+                      <Label>AI Mode Usage (%)</Label>
+                      <Slider
+                        value={[marketData.washerOnly.aiModeUsage]}
+                        max={100}
+                        step={1}
+                        onValueChange={(value) => handleAIModeChange('washerOnly', value)}
+                      />
+                      <p className="text-sm text-gray-500 mt-1">{marketData.washerOnly.aiModeUsage}%</p>
                     </div>
                   </div>
                 </div>
@@ -431,6 +472,16 @@ const SamsungPotential = () => {
                       />
                       <p className="text-sm text-gray-500 mt-1">{marketData.acFridge.adoptionRate}%</p>
                     </div>
+                    <div>
+                      <Label>AI Mode Usage (%)</Label>
+                      <Slider
+                        value={[marketData.acFridge.aiModeUsage]}
+                        max={100}
+                        step={1}
+                        onValueChange={(value) => handleAIModeChange('acFridge', value)}
+                      />
+                      <p className="text-sm text-gray-500 mt-1">{marketData.acFridge.aiModeUsage}%</p>
+                    </div>
                   </div>
 
                   {/* AC + Washer */}
@@ -453,6 +504,16 @@ const SamsungPotential = () => {
                       />
                       <p className="text-sm text-gray-500 mt-1">{marketData.acWasher.adoptionRate}%</p>
                     </div>
+                    <div>
+                      <Label>AI Mode Usage (%)</Label>
+                      <Slider
+                        value={[marketData.acWasher.aiModeUsage]}
+                        max={100}
+                        step={1}
+                        onValueChange={(value) => handleAIModeChange('acWasher', value)}
+                      />
+                      <p className="text-sm text-gray-500 mt-1">{marketData.acWasher.aiModeUsage}%</p>
+                    </div>
                   </div>
 
                   {/* Fridge + Washer */}
@@ -474,6 +535,16 @@ const SamsungPotential = () => {
                         onValueChange={(value) => handleAdoptionChange('fridgeWasher', value)}
                       />
                       <p className="text-sm text-gray-500 mt-1">{marketData.fridgeWasher.adoptionRate}%</p>
+                    </div>
+                    <div>
+                      <Label>AI Mode Usage (%)</Label>
+                      <Slider
+                        value={[marketData.fridgeWasher.aiModeUsage]}
+                        max={100}
+                        step={1}
+                        onValueChange={(value) => handleAIModeChange('fridgeWasher', value)}
+                      />
+                      <p className="text-sm text-gray-500 mt-1">{marketData.fridgeWasher.aiModeUsage}%</p>
                     </div>
                   </div>
                 </div>
@@ -502,6 +573,16 @@ const SamsungPotential = () => {
                         onValueChange={(value) => handleAdoptionChange('allProducts', value)}
                       />
                       <p className="text-sm text-gray-500 mt-1">{marketData.allProducts.adoptionRate}%</p>
+                    </div>
+                    <div>
+                      <Label>AI Mode Usage (%)</Label>
+                      <Slider
+                        value={[marketData.allProducts.aiModeUsage]}
+                        max={100}
+                        step={1}
+                        onValueChange={(value) => handleAIModeChange('allProducts', value)}
+                      />
+                      <p className="text-sm text-gray-500 mt-1">{marketData.allProducts.aiModeUsage}%</p>
                     </div>
                   </div>
                 </div>
