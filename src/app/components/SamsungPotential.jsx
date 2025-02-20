@@ -130,7 +130,7 @@ const SamsungPotential = () => {
 
     setProjectionData(projections);
     return projections;
-  }, [marketData]);
+  }, [marketData, calculateSegmentSavings]);
 
   useEffect(() => {
     const projections = calculateYearlyProjections();
