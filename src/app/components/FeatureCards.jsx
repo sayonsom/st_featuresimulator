@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LeafyGreen, ShoppingCart, Calculator, Lightbulb, Infinity, Zap } from "lucide-react";
+import { LeafyGreen, ShoppingCart, Calculator, Lightbulb, Infinity, Zap, DollarSign } from "lucide-react";
 
 const features = [
   {
@@ -24,6 +24,13 @@ const features = [
     path: "/evaluator",
     icon: Calculator,
     image: "/evaluator.jpg"
+  },
+  {
+    title: "New Bill Calculator",
+    description: "Identify when your bill slab changes so you can save money through SmartThings automations",
+    path: "/bill",
+    icon: DollarSign,
+    image: "/bill.jpg"
   },
   {
     title: "DR Demo",
