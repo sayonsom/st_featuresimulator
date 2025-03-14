@@ -1,12 +1,47 @@
 'use client';
 
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
+// Move this outside the component to avoid recreating it on every render
+const USD_TO_INR = 85;
+const CARBON_CREDIT_VALUE_USD = 30; // USD per ton CO2e
+const CARBON_CREDIT_VALUE = CARBON_CREDIT_VALUE_USD * USD_TO_INR; // Convert to INR
+
+// Move the calculation function outside the component
+const calculateSegmentSavings = (segment, SMART_SAVINGS, CARBON_SAVINGS) => {
+  let energySaved = 0;
+  let carbonSaved = 0;
+
+  // Calculate based on segment type
+  if (segment.includes('ac')) {
+    energySaved += SMART_SAVINGS.ac;
+    carbonSaved += CARBON_SAVINGS.ac;
+  }
+  if (segment.includes('fridge')) {
+    energySaved += SMART_SAVINGS.fridge;
+    carbonSaved += CARBON_SAVINGS.fridge;
+  }
+  if (segment.includes('washer')) {
+    energySaved += SMART_SAVINGS.washer;
+    carbonSaved += CARBON_SAVINGS.washer;
+  }
+
+  // Convert carbon saved from kg to tons for carbon credit calculation
+  const carbonSavedTons = carbonSaved / 1000;
+  const carbonValue = carbonSavedTons * CARBON_CREDIT_VALUE;
+
+  return { 
+    energySaved,  // kWh/year
+    carbonSaved: carbonSavedTons, // tons CO2e/year
+    carbonValue // INR/year
+  };
+};
 
 const SamsungPotential = () => {
   // Updated baseline energy consumption values per household
@@ -30,11 +65,6 @@ const SamsungPotential = () => {
     washer: 225
   };
 
-  // Add this constant at the top with other constants
-  const USD_TO_INR = 85;
-  const CARBON_CREDIT_VALUE_USD = 30; // USD per ton CO2e
-  const CARBON_CREDIT_VALUE = CARBON_CREDIT_VALUE_USD * USD_TO_INR; // Convert to INR
-
   const [marketData, setMarketData] = useState({
     // Single product segments
     acOnly: { customers: 123580, adoptionRate: 5, aiModeUsage: 50 },
@@ -52,34 +82,27 @@ const SamsungPotential = () => {
 
   const [projectionData, setProjectionData] = useState([]);
 
-  const calculateSegmentSavings = (segment, data) => {
-    let energySaved = 0;
-    let carbonSaved = 0;
+  // Memoize the handlers to prevent unnecessary re-renders
+  const handleCustomerChange = useCallback((segment, value) => {
+    setMarketData(prev => ({
+      ...prev,
+      [segment]: { ...prev[segment], customers: Number(value) }
+    }));
+  }, []);
 
-    // Calculate based on segment type
-    if (segment.includes('ac')) {
-      energySaved += SMART_SAVINGS.ac;
-      carbonSaved += CARBON_SAVINGS.ac;
-    }
-    if (segment.includes('fridge')) {
-      energySaved += SMART_SAVINGS.fridge;
-      carbonSaved += CARBON_SAVINGS.fridge;
-    }
-    if (segment.includes('washer')) {
-      energySaved += SMART_SAVINGS.washer;
-      carbonSaved += CARBON_SAVINGS.washer;
-    }
+  const handleAdoptionChange = useCallback((segment, value) => {
+    setMarketData(prev => ({
+      ...prev,
+      [segment]: { ...prev[segment], adoptionRate: value[0] }
+    }));
+  }, []);
 
-    // Convert carbon saved from kg to tons for carbon credit calculation
-    const carbonSavedTons = carbonSaved / 1000;
-    const carbonValue = carbonSavedTons * CARBON_CREDIT_VALUE;
-
-    return { 
-      energySaved,  // kWh/year
-      carbonSaved: carbonSavedTons, // tons CO2e/year
-      carbonValue // INR/year
-    };
-  };
+  const handleAIModeChange = useCallback((segment, value) => {
+    setMarketData(prev => ({
+      ...prev,
+      [segment]: { ...prev[segment], aiModeUsage: value[0] }
+    }));
+  }, []);
 
   const calculateYearlyProjections = useCallback(() => {
     const years = [2025, 2026, 2027, 2028, 2029, 2030];
@@ -109,7 +132,7 @@ const SamsungPotential = () => {
         const aiModeCustomers = totalAdoptedCustomers * (aiModeUsage / 100);
         
         // Only calculate savings for customers using AI mode
-        const { energySaved, carbonSaved, carbonValue } = calculateSegmentSavings(segment, data);
+        const { energySaved, carbonSaved, carbonValue } = calculateSegmentSavings(segment, SMART_SAVINGS, CARBON_SAVINGS);
         
         totalEnergySaved += energySaved * aiModeCustomers;
         totalCarbonSaved += carbonSaved * aiModeCustomers;
@@ -128,66 +151,58 @@ const SamsungPotential = () => {
       };
     });
 
-    setProjectionData(projections);
     return projections;
-  }, [marketData, calculateSegmentSavings]);
+  }, [marketData]);
 
+  // Use a stable dependency array to prevent infinite loops
   useEffect(() => {
     const projections = calculateYearlyProjections();
     setProjectionData(projections);
   }, [calculateYearlyProjections]);
 
-  const handleCustomerChange = (segment, value) => {
-    setMarketData(prev => ({
-      ...prev,
-      [segment]: { ...prev[segment], customers: Number(value) }
-    }));
-  };
-
-  const handleAdoptionChange = (segment, value) => {
-    setMarketData(prev => ({
-      ...prev,
-      [segment]: { ...prev[segment], adoptionRate: value[0] }
-    }));
-  };
-
-  const handleAIModeChange = (segment, value) => {
-    setMarketData(prev => ({
-      ...prev,
-      [segment]: { ...prev[segment], aiModeUsage: value[0] }
-    }));
-  };
-
   // Format large numbers with commas
-  const formatNumber = (num) => {
+  const formatNumber = useCallback((num) => {
     return new Intl.NumberFormat('en-IN').format(Math.round(num));
-  };
+  }, []);
 
   // Add this helper function
-  const calculateGrowthPercentage = (value2030, value2027) => {
+  const calculateGrowthPercentage = useCallback((value2030, value2027) => {
     if (!value2027) return 0;
     return ((value2030 - value2027) / value2027 * 100).toFixed(1);
-  };
+  }, []);
+
+  // Memoize the initial render of projection data to prevent infinite loops
+  const initialProjectionData = useMemo(() => {
+    return projectionData.length > 0 ? projectionData : Array(6).fill({
+      year: 0,
+      totalEnergySaved: 0,
+      totalCarbonSaved: 0,
+      totalCarbonValue: 0,
+      adoptedHouseholds: 0,
+      avgEnergySavedPerHousehold: 0,
+      avgCarbonSavedPerHousehold: 0
+    });
+  }, [projectionData]);
 
   return (
     <div className="w-full p-4">
       {/* Summary Statistics */}
-      <div className="grid grid-cols-6 gap-4 mb-6">
-        <Card className="bg-white">
-          <CardHeader>
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+        <Card className="bg-white shadow-sm">
+          <CardHeader className="pb-2">
             <CardTitle className="text-lg">Total Households</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-lg">
-                <span className="font-semibold">{formatNumber(projectionData[0]?.adoptedHouseholds || 0)}</span>
+                <span className="font-semibold">{formatNumber(initialProjectionData[0]?.adoptedHouseholds || 0)}</span>
                 <span className="text-gray-400">→</span>
-                <span className="font-semibold text-green-600">{formatNumber(projectionData[5]?.adoptedHouseholds || 0)}</span>
+                <span className="font-semibold text-green-600">{formatNumber(initialProjectionData[5]?.adoptedHouseholds || 0)}</span>
               </div>
             </div>
             <div className="h-24">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={projectionData}>
+                <LineChart data={initialProjectionData}>
                   <XAxis 
                     dataKey="year" 
                     tick={{ fontSize: 10 }}
@@ -215,7 +230,7 @@ const SamsungPotential = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-white">
+        <Card className="bg-white shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Energy Saving Per Household</CardTitle>
           </CardHeader>
@@ -223,47 +238,47 @@ const SamsungPotential = () => {
             <div className="flex justify-between items-center">
               <span className="text-sm">2027:</span>
               <span className="font-semibold">
-                {formatNumber(projectionData[2]?.avgEnergySavedPerHousehold || 0)} kWh
+                {formatNumber(initialProjectionData[2]?.avgEnergySavedPerHousehold || 0)} kWh
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm">2030:</span>
               <span className="font-semibold">
-                {formatNumber(projectionData[5]?.avgEnergySavedPerHousehold || 0)} kWh
+                {formatNumber(initialProjectionData[5]?.avgEnergySavedPerHousehold || 0)} kWh
               </span>
             </div>
             <div className="text-sm text-green-600">
               ↑ {calculateGrowthPercentage(
-                projectionData[5]?.avgEnergySavedPerHousehold,
-                projectionData[2]?.avgEnergySavedPerHousehold
+                initialProjectionData[5]?.avgEnergySavedPerHousehold,
+                initialProjectionData[2]?.avgEnergySavedPerHousehold
               )}% growth
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white">
+        <Card className="bg-white shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Total Energy Savings</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-sm">2027:</span>
-              <span className="font-semibold">{formatNumber(projectionData[2]?.totalEnergySaved || 0)} MWh</span>
+              <span className="font-semibold">{formatNumber(initialProjectionData[2]?.totalEnergySaved || 0)} MWh</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm">2030:</span>
-              <span className="font-semibold">{formatNumber(projectionData[5]?.totalEnergySaved || 0)} MWh</span>
+              <span className="font-semibold">{formatNumber(initialProjectionData[5]?.totalEnergySaved || 0)} MWh</span>
             </div>
             <div className="text-sm text-green-600">
               ↑ {calculateGrowthPercentage(
-                projectionData[5]?.totalEnergySaved,
-                projectionData[2]?.totalEnergySaved
+                initialProjectionData[5]?.totalEnergySaved,
+                initialProjectionData[2]?.totalEnergySaved
               )}% growth
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white">
+        <Card className="bg-white shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Carbon Reduced Per Household</CardTitle>
           </CardHeader>
@@ -271,63 +286,63 @@ const SamsungPotential = () => {
             <div className="flex justify-between items-center">
               <span className="text-sm">2027:</span>
               <span className="font-semibold">
-                {formatNumber(projectionData[2]?.avgCarbonSavedPerHousehold || 0)} tons
+                {formatNumber(initialProjectionData[2]?.avgCarbonSavedPerHousehold || 0)} tons
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm">2030:</span>
               <span className="font-semibold">
-                {formatNumber(projectionData[5]?.avgCarbonSavedPerHousehold || 0)} tons
+                {formatNumber(initialProjectionData[5]?.avgCarbonSavedPerHousehold || 0)} tons
               </span>
             </div>
             <div className="text-sm text-green-600">
               ↑ {calculateGrowthPercentage(
-                projectionData[5]?.avgCarbonSavedPerHousehold,
-                projectionData[2]?.avgCarbonSavedPerHousehold
+                initialProjectionData[5]?.avgCarbonSavedPerHousehold,
+                initialProjectionData[2]?.avgCarbonSavedPerHousehold
               )}% growth
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white">
+        <Card className="bg-white shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Total Carbon Savings</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-sm">2027:</span>
-              <span className="font-semibold">{formatNumber(projectionData[2]?.totalCarbonSaved || 0)} tons</span>
+              <span className="font-semibold">{formatNumber(initialProjectionData[2]?.totalCarbonSaved || 0)} tons</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm">2030:</span>
-              <span className="font-semibold">{formatNumber(projectionData[5]?.totalCarbonSaved || 0)} tons</span>
+              <span className="font-semibold">{formatNumber(initialProjectionData[5]?.totalCarbonSaved || 0)} tons</span>
             </div>
             <div className="text-sm text-green-600">
               ↑ {calculateGrowthPercentage(
-                projectionData[5]?.totalCarbonSaved,
-                projectionData[2]?.totalCarbonSaved
+                initialProjectionData[5]?.totalCarbonSaved,
+                initialProjectionData[2]?.totalCarbonSaved
               )}% growth
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white">
+        <Card className="bg-white shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Carbon Credit Value</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-sm">2027:</span>
-              <span className="font-semibold">${formatNumber(projectionData[2]?.totalCarbonValue || 0)}M</span>
+              <span className="font-semibold">${formatNumber(initialProjectionData[2]?.totalCarbonValue || 0)}M</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm">2030:</span>
-              <span className="font-semibold">${formatNumber(projectionData[5]?.totalCarbonValue || 0)}M</span>
+              <span className="font-semibold">${formatNumber(initialProjectionData[5]?.totalCarbonValue || 0)}M</span>
             </div>
             <div className="text-sm text-green-600">
               ↑ {calculateGrowthPercentage(
-                projectionData[5]?.totalCarbonValue,
-                projectionData[2]?.totalCarbonValue
+                initialProjectionData[5]?.totalCarbonValue,
+                initialProjectionData[2]?.totalCarbonValue
               )}% growth
             </div>
           </CardContent>
@@ -335,10 +350,10 @@ const SamsungPotential = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex gap-6">
+      <div className="flex flex-col lg:flex-row gap-6">
         {/* Left Side - Inputs */}
-        <div className="w-1/3">
-          <Card>
+        <div className="w-full lg:w-1/3">
+          <Card className="shadow-sm">
             <CardHeader>
               <CardTitle>Market Segments</CardTitle>
               <CardDescription>Enter customer base and adoption rates</CardDescription>
@@ -348,100 +363,112 @@ const SamsungPotential = () => {
               <div className="space-y-4">
                 <h3 className="font-semibold">Single Product Segments</h3>
                 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* AC Only */}
                   <div className="space-y-4">
                     <div>
-                      <Label>AC Only Customers</Label>
+                      <Label htmlFor="acOnlyCustomers">AC Only Customers</Label>
                       <Input
+                        id="acOnlyCustomers"
                         type="number"
                         value={marketData.acOnly.customers}
                         onChange={(e) => handleCustomerChange('acOnly', e.target.value)}
+                        className="mt-1"
                       />
                     </div>
                     <div>
-                      <Label>Adoption Rate YoY (%)</Label>
+                      <Label htmlFor="acOnlyAdoption">Adoption Rate YoY (%): {marketData.acOnly.adoptionRate}%</Label>
                       <Slider
+                        id="acOnlyAdoption"
                         value={[marketData.acOnly.adoptionRate]}
                         max={100}
                         step={1}
                         onValueChange={(value) => handleAdoptionChange('acOnly', value)}
+                        className="mt-2"
                       />
-                      <p className="text-sm text-gray-500 mt-1">{marketData.acOnly.adoptionRate}%</p>
                     </div>
                     <div>
-                      <Label>AI Mode Usage (%)</Label>
+                      <Label htmlFor="acOnlyAIMode">AI Mode Usage (%): {marketData.acOnly.aiModeUsage}%</Label>
                       <Slider
+                        id="acOnlyAIMode"
                         value={[marketData.acOnly.aiModeUsage]}
                         max={100}
                         step={1}
                         onValueChange={(value) => handleAIModeChange('acOnly', value)}
+                        className="mt-2"
                       />
-                      <p className="text-sm text-gray-500 mt-1">{marketData.acOnly.aiModeUsage}%</p>
                     </div>
                   </div>
 
                   {/* Fridge Only */}
                   <div className="space-y-4">
                     <div>
-                      <Label>Fridge Only Customers</Label>
+                      <Label htmlFor="fridgeOnlyCustomers">Fridge Only Customers</Label>
                       <Input
+                        id="fridgeOnlyCustomers"
                         type="number"
                         value={marketData.fridgeOnly.customers}
                         onChange={(e) => handleCustomerChange('fridgeOnly', e.target.value)}
+                        className="mt-1"
                       />
                     </div>
                     <div>
-                      <Label>Adoption Rate YoY (%)</Label>
+                      <Label htmlFor="fridgeOnlyAdoption">Adoption Rate YoY (%): {marketData.fridgeOnly.adoptionRate}%</Label>
                       <Slider
+                        id="fridgeOnlyAdoption"
                         value={[marketData.fridgeOnly.adoptionRate]}
                         max={100}
                         step={1}
                         onValueChange={(value) => handleAdoptionChange('fridgeOnly', value)}
+                        className="mt-2"
                       />
-                      <p className="text-sm text-gray-500 mt-1">{marketData.fridgeOnly.adoptionRate}%</p>
                     </div>
                     <div>
-                      <Label>AI Mode Usage (%)</Label>
+                      <Label htmlFor="fridgeOnlyAIMode">AI Mode Usage (%): {marketData.fridgeOnly.aiModeUsage}%</Label>
                       <Slider
+                        id="fridgeOnlyAIMode"
                         value={[marketData.fridgeOnly.aiModeUsage]}
                         max={100}
                         step={1}
                         onValueChange={(value) => handleAIModeChange('fridgeOnly', value)}
+                        className="mt-2"
                       />
-                      <p className="text-sm text-gray-500 mt-1">{marketData.fridgeOnly.aiModeUsage}%</p>
                     </div>
                   </div>
 
                   {/* Washer Only */}
                   <div className="space-y-4">
                     <div>
-                      <Label>Washer Only Customers</Label>
+                      <Label htmlFor="washerOnlyCustomers">Washer Only Customers</Label>
                       <Input
+                        id="washerOnlyCustomers"
                         type="number"
                         value={marketData.washerOnly.customers}
                         onChange={(e) => handleCustomerChange('washerOnly', e.target.value)}
+                        className="mt-1"
                       />
                     </div>
                     <div>
-                      <Label>Adoption Rate YoY (%)</Label>
+                      <Label htmlFor="washerOnlyAdoption">Adoption Rate YoY (%): {marketData.washerOnly.adoptionRate}%</Label>
                       <Slider
+                        id="washerOnlyAdoption"
                         value={[marketData.washerOnly.adoptionRate]}
                         max={100}
                         step={1}
                         onValueChange={(value) => handleAdoptionChange('washerOnly', value)}
+                        className="mt-2"
                       />
-                      <p className="text-sm text-gray-500 mt-1">{marketData.washerOnly.adoptionRate}%</p>
                     </div>
                     <div>
-                      <Label>AI Mode Usage (%)</Label>
+                      <Label htmlFor="washerOnlyAIMode">AI Mode Usage (%): {marketData.washerOnly.aiModeUsage}%</Label>
                       <Slider
+                        id="washerOnlyAIMode"
                         value={[marketData.washerOnly.aiModeUsage]}
                         max={100}
                         step={1}
                         onValueChange={(value) => handleAIModeChange('washerOnly', value)}
+                        className="mt-2"
                       />
-                      <p className="text-sm text-gray-500 mt-1">{marketData.washerOnly.aiModeUsage}%</p>
                     </div>
                   </div>
                 </div>
@@ -451,100 +478,112 @@ const SamsungPotential = () => {
               <div className="space-y-4">
                 <h3 className="font-semibold">Two Product Combinations</h3>
                 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* AC + Fridge */}
                   <div className="space-y-4">
                     <div>
-                      <Label>AC + Fridge Customers</Label>
+                      <Label htmlFor="acFridgeCustomers">AC + Fridge Customers</Label>
                       <Input
+                        id="acFridgeCustomers"
                         type="number"
                         value={marketData.acFridge.customers}
                         onChange={(e) => handleCustomerChange('acFridge', e.target.value)}
+                        className="mt-1"
                       />
                     </div>
                     <div>
-                      <Label>Adoption Rate YoY (%)</Label>
+                      <Label htmlFor="acFridgeAdoption">Adoption Rate YoY (%): {marketData.acFridge.adoptionRate}%</Label>
                       <Slider
+                        id="acFridgeAdoption"
                         value={[marketData.acFridge.adoptionRate]}
                         max={100}
                         step={1}
                         onValueChange={(value) => handleAdoptionChange('acFridge', value)}
+                        className="mt-2"
                       />
-                      <p className="text-sm text-gray-500 mt-1">{marketData.acFridge.adoptionRate}%</p>
                     </div>
                     <div>
-                      <Label>AI Mode Usage (%)</Label>
+                      <Label htmlFor="acFridgeAIMode">AI Mode Usage (%): {marketData.acFridge.aiModeUsage}%</Label>
                       <Slider
+                        id="acFridgeAIMode"
                         value={[marketData.acFridge.aiModeUsage]}
                         max={100}
                         step={1}
                         onValueChange={(value) => handleAIModeChange('acFridge', value)}
+                        className="mt-2"
                       />
-                      <p className="text-sm text-gray-500 mt-1">{marketData.acFridge.aiModeUsage}%</p>
                     </div>
                   </div>
 
                   {/* AC + Washer */}
                   <div className="space-y-4">
                     <div>
-                      <Label>AC + Washer Customers</Label>
+                      <Label htmlFor="acWasherCustomers">AC + Washer Customers</Label>
                       <Input
+                        id="acWasherCustomers"
                         type="number"
                         value={marketData.acWasher.customers}
                         onChange={(e) => handleCustomerChange('acWasher', e.target.value)}
+                        className="mt-1"
                       />
                     </div>
                     <div>
-                      <Label>Adoption Rate YoY (%)</Label>
+                      <Label htmlFor="acWasherAdoption">Adoption Rate YoY (%): {marketData.acWasher.adoptionRate}%</Label>
                       <Slider
+                        id="acWasherAdoption"
                         value={[marketData.acWasher.adoptionRate]}
                         max={100}
                         step={1}
                         onValueChange={(value) => handleAdoptionChange('acWasher', value)}
+                        className="mt-2"
                       />
-                      <p className="text-sm text-gray-500 mt-1">{marketData.acWasher.adoptionRate}%</p>
                     </div>
                     <div>
-                      <Label>AI Mode Usage (%)</Label>
+                      <Label htmlFor="acWasherAIMode">AI Mode Usage (%): {marketData.acWasher.aiModeUsage}%</Label>
                       <Slider
+                        id="acWasherAIMode"
                         value={[marketData.acWasher.aiModeUsage]}
                         max={100}
                         step={1}
                         onValueChange={(value) => handleAIModeChange('acWasher', value)}
+                        className="mt-2"
                       />
-                      <p className="text-sm text-gray-500 mt-1">{marketData.acWasher.aiModeUsage}%</p>
                     </div>
                   </div>
 
                   {/* Fridge + Washer */}
                   <div className="space-y-4">
                     <div>
-                      <Label>Fridge + Washer Customers</Label>
+                      <Label htmlFor="fridgeWasherCustomers">Fridge + Washer Customers</Label>
                       <Input
+                        id="fridgeWasherCustomers"
                         type="number"
                         value={marketData.fridgeWasher.customers}
                         onChange={(e) => handleCustomerChange('fridgeWasher', e.target.value)}
+                        className="mt-1"
                       />
                     </div>
                     <div>
-                      <Label>Adoption Rate YoY (%)</Label>
+                      <Label htmlFor="fridgeWasherAdoption">Adoption Rate YoY (%): {marketData.fridgeWasher.adoptionRate}%</Label>
                       <Slider
+                        id="fridgeWasherAdoption"
                         value={[marketData.fridgeWasher.adoptionRate]}
                         max={100}
                         step={1}
                         onValueChange={(value) => handleAdoptionChange('fridgeWasher', value)}
+                        className="mt-2"
                       />
-                      <p className="text-sm text-gray-500 mt-1">{marketData.fridgeWasher.adoptionRate}%</p>
                     </div>
                     <div>
-                      <Label>AI Mode Usage (%)</Label>
+                      <Label htmlFor="fridgeWasherAIMode">AI Mode Usage (%): {marketData.fridgeWasher.aiModeUsage}%</Label>
                       <Slider
+                        id="fridgeWasherAIMode"
                         value={[marketData.fridgeWasher.aiModeUsage]}
                         max={100}
                         step={1}
                         onValueChange={(value) => handleAIModeChange('fridgeWasher', value)}
+                        className="mt-2"
                       />
-                      <p className="text-sm text-gray-500 mt-1">{marketData.fridgeWasher.aiModeUsage}%</p>
                     </div>
                   </div>
                 </div>
@@ -554,35 +593,39 @@ const SamsungPotential = () => {
               <div className="space-y-4">
                 <h3 className="font-semibold">All Products</h3>
                 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-4">
                     <div>
-                      <Label>Customers with All Products</Label>
+                      <Label htmlFor="allProductsCustomers">Customers with All Products</Label>
                       <Input
+                        id="allProductsCustomers"
                         type="number"
                         value={marketData.allProducts.customers}
                         onChange={(e) => handleCustomerChange('allProducts', e.target.value)}
+                        className="mt-1"
                       />
                     </div>
                     <div>
-                      <Label>Adoption Rate YoY (%)</Label>
+                      <Label htmlFor="allProductsAdoption">Adoption Rate YoY (%): {marketData.allProducts.adoptionRate}%</Label>
                       <Slider
+                        id="allProductsAdoption"
                         value={[marketData.allProducts.adoptionRate]}
                         max={100}
                         step={1}
                         onValueChange={(value) => handleAdoptionChange('allProducts', value)}
+                        className="mt-2"
                       />
-                      <p className="text-sm text-gray-500 mt-1">{marketData.allProducts.adoptionRate}%</p>
                     </div>
                     <div>
-                      <Label>AI Mode Usage (%)</Label>
+                      <Label htmlFor="allProductsAIMode">AI Mode Usage (%): {marketData.allProducts.aiModeUsage}%</Label>
                       <Slider
+                        id="allProductsAIMode"
                         value={[marketData.allProducts.aiModeUsage]}
                         max={100}
                         step={1}
                         onValueChange={(value) => handleAIModeChange('allProducts', value)}
+                        className="mt-2"
                       />
-                      <p className="text-sm text-gray-500 mt-1">{marketData.allProducts.aiModeUsage}%</p>
                     </div>
                   </div>
                 </div>
@@ -592,16 +635,16 @@ const SamsungPotential = () => {
         </div>
 
         {/* Right Side - Charts */}
-        <div className="w-2/3">
-          <div className="grid grid-cols-2 gap-4">
+        <div className="w-full lg:w-2/3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Projection Charts */}
-            <Card>
+            <Card className="shadow-sm">
               <CardHeader>
                 <CardTitle>Cumulative Carbon Savings</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={projectionData}>
+                  <LineChart data={initialProjectionData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="year" />
                     <YAxis 
@@ -623,13 +666,13 @@ const SamsungPotential = () => {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="shadow-sm">
               <CardHeader>
                 <CardTitle>Cumulative Energy Savings</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={projectionData}>
+                  <LineChart data={initialProjectionData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="year" />
                     <YAxis 
@@ -651,13 +694,13 @@ const SamsungPotential = () => {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="shadow-sm">
               <CardHeader>
                 <CardTitle>Carbon Credit Value</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={projectionData}>
+                  <LineChart data={initialProjectionData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="year" />
                     <YAxis 
@@ -679,13 +722,13 @@ const SamsungPotential = () => {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="shadow-sm">
               <CardHeader>
                 <CardTitle>Households Adopted</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={projectionData}>
+                  <LineChart data={initialProjectionData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="year" />
                     <YAxis 

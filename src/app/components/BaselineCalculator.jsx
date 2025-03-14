@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,6 +20,29 @@ const SMART_SAVINGS = {
   washing: 0.70  // Up to 70% savings on wash cycle
 };
 
+// Constants for calculations
+const ENERGY_FACTORS = {
+  fridge: 0.004, // kWh per day per liter (1.5 kWh/100L/day)
+  ac: {
+    high: 1.5, // kWh per ton per hour for 1-1.5 ton
+    medium: 1.2, // kWh per ton per hour
+    low: 1.0 // kWh per ton per hour
+  },
+  washingMachine: 0.8 // kWh per kg per cycle
+};
+
+const AC_USAGE_PATTERNS = {
+  high: ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'],
+  medium: ['Mar', 'Nov'],
+  low: ['Dec', 'Jan', 'Feb']
+};
+
+// Emission factor (kg CO2e per kWh) - example for India
+const EMISSION_FACTOR = 0.82;
+
+// Carbon credit market value (INR per metric ton CO2e)
+const CARBON_CREDIT_VALUE = 800;  // Indian carbon market price
+
 const BaselineCalculator = () => {
   // Form state
   const [formData, setFormData] = useState({
@@ -36,29 +59,6 @@ const BaselineCalculator = () => {
     washingMachineCount: 1
   });
 
-  // Constants for calculations
-  const ENERGY_FACTORS = {
-    fridge: 0.004, // kWh per day per liter (1.5 kWh/100L/day)
-    ac: {
-      high: 1.5, // kWh per ton per hour for 1-1.5 ton
-      medium: 1.2, // kWh per ton per hour
-      low: 1.0 // kWh per ton per hour
-    },
-    washingMachine: 0.8 // kWh per kg per cycle
-  };
-
-  const AC_USAGE_PATTERNS = {
-    high: ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'],
-    medium: ['Mar', 'Nov'],
-    low: ['Dec', 'Jan', 'Feb']
-  };
-
-  // Emission factor (kg CO2e per kWh) - example for India
-  const EMISSION_FACTOR = 0.82;
-  
-  // Carbon credit market value (INR per metric ton CO2e)
-  const CARBON_CREDIT_VALUE = 800;  // Indian carbon market price
-
   // State declarations
   const [monthlyData, setMonthlyData] = useState([]);
   const [comparisonData, setComparisonData] = useState([]);
@@ -68,8 +68,8 @@ const BaselineCalculator = () => {
     withAI: { energy: 0, emissions: 0 }
   });
 
-  // Define calculateDensityImpact first
-  const calculateDensityImpact = useCallback(() => {
+  // Define calculateDensityImpact as a memoized function
+  const calculateDensityImpact = useMemo(() => {
     const peoplePerRoom = formData.familyMembers / formData.roomCount;
     if (peoplePerRoom <= 2) return 1; // No impact
     
@@ -79,9 +79,10 @@ const BaselineCalculator = () => {
     return 1 + efficiencyReduction; // Returns something like 1.02 for 2% reduction
   }, [formData.familyMembers, formData.roomCount]);
 
-  // Then define calculateMonthlyEnergy
+  // Then define calculateMonthlyEnergy as a memoized function
   const calculateMonthlyEnergy = useCallback((month, excludeAC = false) => {
-    const densityImpact = calculateDensityImpact();
+    // Use the value directly, not as a function call
+    const densityImpact = calculateDensityImpact;
     
     // Fridge calculation (constant throughout year)
     const fridgeDaily = formData.fridgeSize * ENERGY_FACTORS.fridge; // kWh per day
@@ -111,10 +112,13 @@ const BaselineCalculator = () => {
       acEnergyFactor = 2.5;
     }
 
-    let acEnergy = formData.acTonnage * acEnergyFactor * acHoursPerDay * 30 * 
-      formData.acCount * densityImpact;
-    if (formData.useSmartAC) {
-      acEnergy *= (1 - SMART_SAVINGS.ac);
+    let acEnergy = 0;
+    if (!excludeAC) {
+      acEnergy = formData.acTonnage * acEnergyFactor * acHoursPerDay * 30 * 
+        formData.acCount * densityImpact;
+      if (formData.useSmartAC) {
+        acEnergy *= (1 - SMART_SAVINGS.ac);
+      }
     }
 
     // Washing machine calculation
@@ -138,7 +142,24 @@ const BaselineCalculator = () => {
     };
   }, [formData, calculateDensityImpact]);
 
+  // Memoize the form state update handlers to prevent unnecessary re-renders
+  const handleFormChange = useCallback((field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: typeof value === 'number' ? value : Number(value)
+    }));
+  }, []);
+
+  const handleSwitchChange = useCallback((field, checked) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: checked
+    }));
+  }, []);
+
+  // Use a single useEffect to update all derived state
   useEffect(() => {
+    // Calculate monthly data
     const newMonthlyData = MONTHS.map(month => {
       const data = calculateMonthlyEnergy(month);
       return {
@@ -146,11 +167,10 @@ const BaselineCalculator = () => {
         ...data
       };
     });
-
     setMonthlyData(newMonthlyData);
 
     // Calculate comparison data (baseline without AC vs projected)
-    const comparisonData = MONTHS.map(month => {
+    const newComparisonData = MONTHS.map(month => {
       const baselineData = calculateMonthlyEnergy(month, true); // Exclude AC
       const projectedData = calculateMonthlyEnergy(month, false); // Include AC
       return {
@@ -159,10 +179,10 @@ const BaselineCalculator = () => {
         projected: projectedData.emissions
       };
     });
-    setComparisonData(comparisonData);
+    setComparisonData(newComparisonData);
 
     // Calculate energy comparison data
-    const energyComparisonData = MONTHS.map(month => {
+    const newEnergyComparisonData = MONTHS.map(month => {
       // Calculate baseline energy (without any AI savings)
       const baselineCalc = calculateMonthlyEnergy(month);
       let baselineEnergy = baselineCalc.fridgeEnergy + baselineCalc.acEnergy + baselineCalc.washingEnergy;
@@ -187,66 +207,53 @@ const BaselineCalculator = () => {
         savings: Math.round(baselineEnergy - withAIEnergy)
       };
     });
-    setEnergyComparisonData(energyComparisonData);
+    setEnergyComparisonData(newEnergyComparisonData);
 
     // Calculate annual summaries
-    const calculateAnnualData = () => {
-      let baselineAnnualEnergy = 0;
-      let withAIAnnualEnergy = 0;
+    let baselineAnnualEnergy = 0;
+    let withAIAnnualEnergy = 0;
 
-      MONTHS.forEach(month => {
-        // Store original AI settings
-        const originalSettings = {
-          useSmartAC: formData.useSmartAC,
-          useSmartFridge: formData.useSmartFridge,
-          useSmartWashing: formData.useSmartWashing
-        };
+    MONTHS.forEach(month => {
+      // Calculate baseline (no AI)
+      const baselineMonthly = calculateMonthlyEnergy(month);
+      baselineAnnualEnergy += baselineMonthly.totalEnergy;
 
-        // Calculate baseline (no AI)
-        const baselineMonthly = calculateMonthlyEnergy(month);
-        baselineAnnualEnergy += baselineMonthly.totalEnergy;
+      // Calculate with current AI settings
+      let withAIEnergy = baselineMonthly.totalEnergy;
+      if (formData.useSmartFridge) {
+        withAIEnergy -= baselineMonthly.fridgeEnergy * SMART_SAVINGS.fridge;
+      }
+      if (formData.useSmartAC) {
+        withAIEnergy -= baselineMonthly.acEnergy * SMART_SAVINGS.ac;
+      }
+      if (formData.useSmartWashing) {
+        withAIEnergy -= baselineMonthly.washingEnergy * SMART_SAVINGS.washing;
+      }
+      withAIAnnualEnergy += withAIEnergy;
+    });
 
-        // Calculate with current AI settings
-        let withAIEnergy = baselineMonthly.fridgeEnergy;
-        if (formData.useSmartFridge) {
-          withAIEnergy -= baselineMonthly.fridgeEnergy * SMART_SAVINGS.fridge;
-        }
-        withAIEnergy += baselineMonthly.acEnergy;
-        if (formData.useSmartAC) {
-          withAIEnergy -= baselineMonthly.acEnergy * SMART_SAVINGS.ac;
-        }
-        withAIEnergy += baselineMonthly.washingEnergy;
-        if (formData.useSmartWashing) {
-          withAIEnergy -= baselineMonthly.washingEnergy * SMART_SAVINGS.washing;
-        }
-        withAIAnnualEnergy += withAIEnergy;
-      });
-
-      return {
-        withoutAI: {
-          energy: baselineAnnualEnergy,
-          emissions: baselineAnnualEnergy * EMISSION_FACTOR
-        },
-        withAI: {
-          energy: withAIAnnualEnergy,
-          emissions: withAIAnnualEnergy * EMISSION_FACTOR
-        }
-      };
+    const newAnnualSummary = {
+      withoutAI: {
+        energy: baselineAnnualEnergy,
+        emissions: baselineAnnualEnergy * EMISSION_FACTOR
+      },
+      withAI: {
+        energy: withAIAnnualEnergy,
+        emissions: withAIAnnualEnergy * EMISSION_FACTOR
+      }
     };
-
-    const annualData = calculateAnnualData();
-    setAnnualSummary(annualData);
-  }, [formData, calculateMonthlyEnergy]);
+    setAnnualSummary(newAnnualSummary);
+  }, [calculateMonthlyEnergy]);
 
   return (
     <div className="w-full space-y-6">
       {/* Impact Card */}
-      <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-100">
+      <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-100 shadow-sm">
         <CardHeader>
           <CardTitle className="text-green-800">Environmental Impact of SmartThings AI</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white rounded-lg p-4 shadow-sm">
               <p className="text-sm text-gray-600">Carbon Savings</p>
               <p className="text-2xl font-bold text-green-600">
@@ -275,7 +282,7 @@ const BaselineCalculator = () => {
               </p>
               <p className="text-xs text-gray-500 mt-1">*at ₹8/kWh</p>
             </div>
-            <div className="bg-white rounded-lg p-4 shadow-sm col-span-4">
+            <div className="bg-white rounded-lg p-4 shadow-sm col-span-1 md:col-span-2 lg:col-span-4">
               <p className="text-sm text-gray-600">Potential Carbon Credit Value</p>
               <div className="flex items-baseline gap-2">
                 <p className="text-2xl font-bold text-purple-600">
@@ -291,8 +298,8 @@ const BaselineCalculator = () => {
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>Without SmartThings AI</CardTitle>
           </CardHeader>
@@ -304,7 +311,7 @@ const BaselineCalculator = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>With SmartThings AI</CardTitle>
           </CardHeader>
@@ -318,19 +325,20 @@ const BaselineCalculator = () => {
       </div>
 
       {/* Input Form */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>Household Details</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="roomCount">Number of Rooms</Label>
               <Input
                 id="roomCount"
                 type="number"
                 value={formData.roomCount}
-                onChange={(e) => setFormData({...formData, roomCount: Number(e.target.value)})}
+                onChange={(e) => handleFormChange('roomCount', e.target.value)}
+                className="mt-1"
               />
             </div>
             <div className="space-y-2">
@@ -339,7 +347,8 @@ const BaselineCalculator = () => {
                 id="familyMembers"
                 type="number"
                 value={formData.familyMembers}
-                onChange={(e) => setFormData({...formData, familyMembers: Number(e.target.value)})}
+                onChange={(e) => handleFormChange('familyMembers', e.target.value)}
+                className="mt-1"
               />
             </div>
           </div>
@@ -347,7 +356,7 @@ const BaselineCalculator = () => {
       </Card>
 
       {/* Appliances */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>Appliances</CardTitle>
           <p className="text-sm text-gray-500 italic">
@@ -357,14 +366,15 @@ const BaselineCalculator = () => {
         <CardContent>
           <div className="space-y-6">
             {/* Fridge */}
-            <div className="grid grid-cols-3 gap-4 items-center">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
               <div className="space-y-2">
                 <Label htmlFor="fridgeSize">Refrigerator Size (Liters)</Label>
                 <Input
                   id="fridgeSize"
                   type="number"
                   value={formData.fridgeSize}
-                  onChange={(e) => setFormData({...formData, fridgeSize: Number(e.target.value)})}
+                  onChange={(e) => handleFormChange('fridgeSize', e.target.value)}
+                  className="mt-1"
                 />
               </div>
               <div className="space-y-2">
@@ -374,28 +384,30 @@ const BaselineCalculator = () => {
                   type="number"
                   min="1"
                   value={formData.fridgeCount}
-                  onChange={(e) => setFormData({...formData, fridgeCount: Number(e.target.value)})}
+                  onChange={(e) => handleFormChange('fridgeCount', e.target.value)}
+                  className="mt-1"
                 />
               </div>
               <div className="flex items-center space-x-2">
                 <Switch
                   id="smartFridge"
                   checked={formData.useSmartFridge}
-                  onCheckedChange={(checked) => setFormData({...formData, useSmartFridge: checked})}
+                  onCheckedChange={(checked) => handleSwitchChange('useSmartFridge', checked)}
                 />
-                <Label htmlFor="smartFridge">Use SmartThings AI (up to 30% savings)</Label>
+                <Label htmlFor="smartFridge" className="cursor-pointer">Use SmartThings AI (up to 30% savings)</Label>
               </div>
             </div>
 
             {/* AC */}
-            <div className="grid grid-cols-3 gap-4 items-center">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
               <div className="space-y-2">
                 <Label htmlFor="acTonnage">AC Capacity (Tons)</Label>
                 <Input
                   id="acTonnage"
                   type="number"
                   value={formData.acTonnage}
-                  onChange={(e) => setFormData({...formData, acTonnage: Number(e.target.value)})}
+                  onChange={(e) => handleFormChange('acTonnage', e.target.value)}
+                  className="mt-1"
                 />
               </div>
               <div className="space-y-2">
@@ -405,28 +417,30 @@ const BaselineCalculator = () => {
                   type="number"
                   min="1"
                   value={formData.acCount}
-                  onChange={(e) => setFormData({...formData, acCount: Number(e.target.value)})}
+                  onChange={(e) => handleFormChange('acCount', e.target.value)}
+                  className="mt-1"
                 />
               </div>
               <div className="flex items-center space-x-2">
                 <Switch
                   id="smartAC"
                   checked={formData.useSmartAC}
-                  onCheckedChange={(checked) => setFormData({...formData, useSmartAC: checked})}
+                  onCheckedChange={(checked) => handleSwitchChange('useSmartAC', checked)}
                 />
-                <Label htmlFor="smartAC">Use SmartThings AI (up to 22% savings)</Label>
+                <Label htmlFor="smartAC" className="cursor-pointer">Use SmartThings AI (up to 22% savings)</Label>
               </div>
             </div>
 
             {/* Washing Machine */}
-            <div className="grid grid-cols-3 gap-4 items-center">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
               <div className="space-y-2">
                 <Label htmlFor="washingMachineCapacity">Washing Machine Capacity (kg)</Label>
                 <Input
                   id="washingMachineCapacity"
                   type="number"
                   value={formData.washingMachineCapacity}
-                  onChange={(e) => setFormData({...formData, washingMachineCapacity: Number(e.target.value)})}
+                  onChange={(e) => handleFormChange('washingMachineCapacity', e.target.value)}
+                  className="mt-1"
                 />
               </div>
               <div className="space-y-2">
@@ -436,16 +450,17 @@ const BaselineCalculator = () => {
                   type="number"
                   min="1"
                   value={formData.washingMachineCount}
-                  onChange={(e) => setFormData({...formData, washingMachineCount: Number(e.target.value)})}
+                  onChange={(e) => handleFormChange('washingMachineCount', e.target.value)}
+                  className="mt-1"
                 />
               </div>
               <div className="flex items-center space-x-2">
                 <Switch
                   id="smartWashing"
                   checked={formData.useSmartWashing}
-                  onCheckedChange={(checked) => setFormData({...formData, useSmartWashing: checked})}
+                  onCheckedChange={(checked) => handleSwitchChange('useSmartWashing', checked)}
                 />
-                <Label htmlFor="smartWashing">Use SmartThings AI (up to 70% savings)</Label>
+                <Label htmlFor="smartWashing" className="cursor-pointer">Use SmartThings AI (up to 70% savings)</Label>
               </div>
             </div>
           </div>
@@ -453,7 +468,7 @@ const BaselineCalculator = () => {
       </Card>
 
       {/* Emission Factors Info */}
-      <Alert>
+      <Alert className="shadow-sm">
         <AlertDescription>
           Calculations use an emission factor of {EMISSION_FACTOR} kg CO2e/kWh based on India&apos;s electricity grid mix:
           <br />- Coal-based power: ~70% of generation
@@ -463,9 +478,9 @@ const BaselineCalculator = () => {
       </Alert>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Monthly Emissions Chart */}
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>Monthly CO2e Emissions</CardTitle>
           </CardHeader>
@@ -488,7 +503,7 @@ const BaselineCalculator = () => {
         </Card>
 
         {/* Monthly Energy Usage Chart */}
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>Monthly Energy Usage</CardTitle>
           </CardHeader>
@@ -512,7 +527,7 @@ const BaselineCalculator = () => {
       </div>
 
       {/* Calculation Theory */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>Understanding the Calculations</CardTitle>
         </CardHeader>
@@ -548,7 +563,7 @@ const BaselineCalculator = () => {
       </Card>
 
       {/* Energy Savings Comparison */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>Monthly Energy Consumption Comparison</CardTitle>
           <p className="text-sm text-gray-600">Baseline vs SmartThings AI Energy Usage</p>
@@ -597,7 +612,7 @@ const BaselineCalculator = () => {
       </Card>
 
       {/* Emissions Comparison Chart */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>Annual Emissions Comparison</CardTitle>
           <p className="text-sm text-gray-600">Baseline (without AC) vs Projected Emissions</p>
@@ -634,7 +649,7 @@ const BaselineCalculator = () => {
       </Card>
 
       {/* References Section */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>References</CardTitle>
         </CardHeader>
@@ -646,7 +661,7 @@ const BaselineCalculator = () => {
                 href="https://news.samsung.com/us/samsung-new-smartthings-energy-features-take-home-energy-management-next-level/" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
+                className="text-blue-600 hover:underline ml-1"
               >
                 New SmartThings Energy Features Take Home Energy Management to Next Level
               </a>
@@ -657,7 +672,7 @@ const BaselineCalculator = () => {
                 href="https://www.samsung.com/latin_en/support/home-appliances/how-to-save-energy-with-your-washing-machine/" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
+                className="text-blue-600 hover:underline ml-1"
               >
                 Learn how to save up to 70% energy with your Samsung Washer and Washer Dryer
               </a>
